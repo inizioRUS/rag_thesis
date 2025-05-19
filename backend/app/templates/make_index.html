@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+
+{% block title %}Создание индекса{% endblock %}
+
+{% block content %}
+<h1 class="text-xl font-bold mb-4">Создание индекса</h1>
+
+<form id="index-form">
+    <div class="mb-4">
+        <label for="name" class="block text-sm font-medium text-gray-700">Название индекса</label>
+        <input type="text" id="name" name="name" class="mt-1 block w-full p-2 border border-gray-300 rounded" required>
+    </div>
+
+    <div class="mb-4">
+        <label for="description" class="block text-sm font-medium text-gray-700">Описание</label>
+        <textarea id="description" name="description" class="mt-1 block w-full p-2 border border-gray-300 rounded" required></textarea>
+    </div>
+
+    <div class="mb-4">
+        <label class="block text-sm font-medium text-gray-700">Загрузите архив с текстом (zip)</label>
+        <div id="dropzone" class="mt-2 p-6 border-2 border-dashed border-gray-300 rounded text-center cursor-pointer bg-gray-50">
+            <p id="dropzone-text">Перетащите файл сюда или нажмите для выбора</p>
+            <input type="file" id="file-input" name="file" accept=".zip" class="hidden" required>
+        </div>
+        <p id="file-name" class="text-sm text-gray-600 mt-2"></p>
+    </div>
+
+    <div class="mb-4">
+        <label for="milvus_index_name" class="block text-sm font-medium text-gray-700">Название индекса в Milvus</label>
+        <input type="text" id="milvus_index_name" name="milvus_index_name" class="mt-1 block w-full p-2 border border-gray-300 rounded" required>
+    </div>
+
+    <div class="mb-4">
+        <label for="is_private" class="block text-sm font-medium text-gray-700">Приватный индекс?</label>
+        <input type="checkbox" id="is_private" name="is_private" class="mt-1">
+    </div>
+
+    <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded">Создать индекс</button>
+</form>
+
+<!-- Статус обработки -->
+<div id="status-block" class="mt-6 hidden">
+    <h2 class="text-lg font-semibold">Статус загрузки:</h2>
+    <p id="status-text" class="text-gray-800">Отправка архива...</p>
+</div>
+
+
+{% block scripts %}
+<script>
+
+    const dropzone = document.getElementById("dropzone");
+    const fileInput = document.getElementById("file-input");
+    const fileNameDisplay = document.getElementById("file-name");
+
+    dropzone.addEventListener("click", () => fileInput.click());
+    fileInput.addEventListener("change", () => {
+        fileNameDisplay.textContent = fileInput.files.length > 0
+            ? "Выбран файл: " + fileInput.files[0].name
+            : "";
+    });
+    dropzone.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        dropzone.classList.add("bg-blue-100");
+    });
+    dropzone.addEventListener("dragleave", () => {
+        dropzone.classList.remove("bg-blue-100");
+    });
+    dropzone.addEventListener("drop", (e) => {
+        e.preventDefault();
+        dropzone.classList.remove("bg-blue-100");
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            fileInput.files = files;
+            fileNameDisplay.textContent = "Выбран файл: " + files[0].name;
+        }
+    });
+
+    // Обработка отправки формы
+    const form = document.getElementById("index-form");
+    const statusBlock = document.getElementById("status-block");
+    const statusText = document.getElementById("status-text");
+
+    form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+
+        const formData = new FormData(form);
+        formData.append("file", fileInput.files[0]);
+
+        statusBlock.classList.remove("hidden");
+        statusText.textContent = "Отправка архива...";
+
+        try {
+            const response = await fetch("/make_index", {
+                method: "POST",
+                body: formData,
+            });
+
+            if (!response.ok) throw new Error("Ошибка отправки");
+
+            const data = await response.json();
+            const taskId = data.task_id;
+
+            // Начать опрос статуса
+            pollStatus(taskId);
+        } catch (err) {
+            statusText.textContent = "Ошибка при отправке: " + err.message;
+        }
+    });
+
+    async function pollStatus(taskId) {
+        const interval = setInterval(async () => {
+            const res = await fetch(`http://localhost:8001/status/${taskId}`);
+            const data = await res.json();
+
+            statusText.textContent = "Статус: " + data.status;
+
+            if (data.status === "готово") {
+                clearInterval(interval);
+                statusText.textContent += " ✅ Индекс успешно создан!";
+            }
+        }, 3000);
+    }
+</script>
+{% endblock %}
+
+
+{% endblock %}

@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block title %}Чат{% endblock %}
+
+{% block content %}
+    <div class="w-full max-w-2xl mx-auto my-8 p-6 border rounded-lg shadow-lg">
+
+        <!-- Название и описание индекса -->
+        <div class="mb-6">
+            <h1 class="text-2xl font-bold text-gray-800 mb-2">{{ index.name }}</h1>
+            <p class="text-gray-600">{{ index.description }}</p>
+        </div>
+
+        <!-- Контейнер чата -->
+        <div id="chat-container">
+            <div id="chat-history" class="h-96 overflow-y-auto mb-4 p-4 bg-gray-100 rounded-lg">
+                <!-- История сообщений будет добавляться сюда -->
+            </div>
+
+            <div id="chat-input-container" class="flex gap-4">
+                <input
+                    id="message-input"
+                    type="text"
+                    placeholder="Напишите сообщение..."
+                    class="flex-grow p-2 border rounded-md focus:outline-none"
+                    autocomplete="off"
+                    onkeydown="if(event.key === 'Enter') sendMessage()"
+                />
+                <button
+                    id="send-button"
+                    class="bg-blue-600 text-white px-4 py-2 rounded-md"
+                    onclick="sendMessage()">
+                    Отправить
+                </button>
+            </div>
+        </div>
+    </div>
+{% block scripts %}
+<script>
+    const indexId = "{{ index.id }}";
+
+    const chatHistory = document.getElementById("chat-history");
+    const messageInput = document.getElementById("message-input");
+
+    function appendMessage(text, sender = 'user') {
+        const messageDiv = document.createElement('div');
+        messageDiv.classList.add(sender === 'user' ? 'text-right' : 'text-left');
+        messageDiv.innerHTML = `<p class="bg-gray-200 p-3 rounded-md inline-block max-w-xs">${text}</p>`;
+        chatHistory.appendChild(messageDiv);
+        chatHistory.scrollTop = chatHistory.scrollHeight;
+    }
+
+    async function sendMessage() {
+        const message = messageInput.value.trim();
+        if (!message) return;
+
+        appendMessage(message, 'user');
+        messageInput.value = '';
+        messageInput.disabled = true;
+
+        try {
+            const response = await fetch('/get_ml_response', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    message: message,
+                    index_id: indexId
+                })
+            });
+
+            const data = await response.json();
+            const mlResponse = data.reply || 'Ошибка получения ответа от сервера.';
+            appendMessage(mlResponse, 'ml');
+        } catch (error) {
+            console.error("Ошибка запроса:", error);
+            appendMessage("Ошибка подключения к серверу.", 'ml');
+        } finally {
+            messageInput.disabled = false;
+            messageInput.focus();
+        }
+    }
+</script>
+{% endblock %}
+{% endblock %}

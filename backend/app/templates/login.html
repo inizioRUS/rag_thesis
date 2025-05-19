@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Вход{% endblock %}
+{% block content %}
+    <h1 class="text-xl font-bold mb-4">Вход</h1>
+    {% if error %}<p class="text-red-600 mb-2">{{ error }}</p>{% endif %}
+    <form method="post" class="space-y-4">
+        <div>
+            <label class="block">Имя пользователя</label>
+            <input type="text" name="username" required class="w-full p-2 border rounded">
+        </div>
+        <div>
+            <label class="block">Пароль</label>
+            <input type="password" name="password" required class="w-full p-2 border rounded">
+        </div>
+        <button class="bg-blue-600 text-white px-4 py-2 rounded">Войти</button>
+    </form>
+    <p class="mt-4">Нет аккаунта? <a href="/register" class="text-blue-600 hover:underline">Регистрация</a></p>
+{% endblock %}

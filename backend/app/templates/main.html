@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% block title %}Главная{% endblock %}
+
+{% block content %}
+    <h1 class="text-2xl font-bold mb-6">Добро пожаловать в IndexHub</h1>
+
+    <!-- Навигация -->
+    <div class="flex gap-4 mb-6">
+        {% if user %}
+            <a href="/home" class="bg-gray-300 px-4 py-2 rounded">Личный кабинет</a>
+            <a href="/make_index" class="bg-green-500 text-white px-4 py-2 rounded">Создать индекс</a>
+            <a href="/logout" class="bg-red-600 text-white px-4 py-2 rounded">Выйти</a>
+        {% else %}
+            <a href="/login" class="bg-blue-600 text-white px-4 py-2 rounded">Войти</a>
+            <a href="/register" class="bg-green-600 text-white px-4 py-2 rounded">Зарегистрироваться</a>
+        {% endif %}
+    </div>
+
+    <h2 class="text-xl font-semibold mb-4">Публичные индексы</h2>
+
+    <!-- Галерея индексов -->
+    <div id="index-gallery" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+        {% for index in indices %}
+            <div class="bg-white p-4 rounded-lg shadow-md hover:shadow-lg transition-shadow duration-200">
+                <h3 class="text-lg font-semibold mb-2">{{ index.name }}</h3>
+                <p class="text-gray-600 mb-4">{{ index.description }}</p>
+                <a href="/index/{{ index.id }}" class="text-blue-600 hover:underline">Подробнее</a>
+            </div>
+        {% endfor %}
+    </div>
+
+    <!-- Кнопка загрузки -->
+    <div id="load-more-container" class="mt-6 text-center">
+        <button id="load-more" class="bg-blue-600 text-white px-4 py-2 rounded">Загрузить больше</button>
+    </div>
+{% block scripts %}
+<script>
+    let currentPage = 1;
+    const loadMoreButton = document.getElementById('load-more');
+    const gallery = document.getElementById('index-gallery');
+
+    loadMoreButton.addEventListener('click', () => {
+        currentPage++;
+        loadMoreIndices(currentPage);
+    });
+
+    function loadMoreIndices(page) {
+        fetch(`/get_indices?page=${page}`)
+            .then(response => {
+                if (!response.ok) throw new Error("Ошибка запроса");
+                return response.json();
+            })
+            .then(data => {
+                if (data.indices.length === 0) {
+                    loadMoreButton.remove();
+                    return;
+                }
+
+                data.indices.forEach(index => {
+                    const card = document.createElement('div');
+                    card.className = "bg-white p-4 rounded-lg shadow-md hover:shadow-lg transition-shadow duration-200";
+                    card.innerHTML = `
+                        <h3 class="text-lg font-semibold mb-2">${index.name}</h3>
+                        <p class="text-gray-600 mb-4">${index.description}</p>
+                        <a href="/index/${index.id}" class="text-blue-600 hover:underline">Подробнее</a>
+                    `;
+                    gallery.appendChild(card);
+                });
+            })
+            .catch(err => {
+                console.error("Ошибка загрузки индексов:", err);
+                loadMoreButton.remove();
+            });
+    }
+</script>
+{% endblock %}
+{% endblock %}

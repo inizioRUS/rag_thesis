@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block title %}Личный кабинет{% endblock %}
+
+{% block content %}
+    <h1 class="text-2xl font-bold mb-6">Личный кабинет</h1>
+
+    <div class="flex gap-4 mb-6">
+        <a href="/main" class="bg-gray-300 px-4 py-2 rounded">Главная</a>
+        <a href="/make_index" class="bg-green-500 text-white px-4 py-2 rounded">Создать индекс</a>
+        <a href="/logout" class="bg-red-600 text-white px-4 py-2 rounded">Выйти</a>
+    </div>
+
+    <h2 class="text-xl font-semibold mb-4">Ваши индексы</h2>
+
+    {% if indices %}
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+{% for index in indices %}
+    <div class="bg-white p-4 rounded-lg shadow-md hover:shadow-lg transition-shadow duration-200">
+        <h3 class="text-lg font-semibold mb-2">{{ index.name }}</h3>
+        <p class="text-gray-600 mb-4">{{ index.description }}</p>
+
+        <div class="flex flex-col gap-2">
+            <a href="/index/{{ index.id }}" class="text-white text-center bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-md">
+                💬 Перейти в чат
+            </a>
+            <a href="/setting_index/{{ index.id }}" class="text-white text-center bg-gray-600 hover:bg-gray-700 px-4 py-2 rounded-md">
+                ⚙️ Настройки
+            </a>
+        </div>
+    </div>
+{% endfor %}
+
+        </div>
+    {% else %}
+        <p class="text-gray-500">У вас пока нет индексов.</p>
+    {% endif %}
+{% endblock %}

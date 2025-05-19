@@ -1,0 +1,303 @@
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+}
+/* index.css */
+.container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem;
+  min-height: 100vh;
+  background-color: #f8fafc;
+}
+
+.header {
+  font-size: 2.75rem;
+  font-weight: 600;
+  color: #1e293b;
+  text-align: center;
+  margin: 0 auto 2.5rem;
+  max-width: 90%;
+  line-height: 1.3;
+  word-wrap: break-word;
+}
+
+.auth-section {
+  display: flex;
+  gap: 1.2rem;
+  justify-content: center;
+  margin-bottom: 3rem;
+  flex-wrap: wrap;
+}
+
+.button {
+  padding: 1rem 2rem;
+  border-radius: 12px;
+  font-weight: 600;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.8rem;
+  position: relative;
+  overflow: hidden;
+  border: 2px solid transparent;
+  cursor: pointer;
+  font-size: 1.05rem;
+  letter-spacing: 0.02em;
+  background-clip: padding-box;
+}
+
+/* Базовые цвета и градиенты */
+.button.primary {
+  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+  color: white;
+  box-shadow: 0 2px 8px -2px rgba(79, 70, 229, 0.3);
+}
+
+.button.secondary {
+  background: linear-gradient(to bottom, #ffffff 0%, #f8fafc 100%);
+  color: #374151;
+  border-color: #e5e7eb;
+  box-shadow: 0 2px 6px -1px rgba(0,0,0,0.05);
+}
+
+.button.danger {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  color: white;
+  box-shadow: 0 2px 8px -2px rgba(220, 38, 38, 0.2);
+}
+
+.button.accent {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+  box-shadow: 0 2px 8px -2px rgba(5, 150, 105, 0.2);
+}
+
+/* Эффекты при наведении */
+.button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px -2px rgba(0,0,0,0.15);
+}
+
+/* Эффект "жидкого" перехода */
+.button::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(255,255,255,0.1);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.button:hover::after {
+  opacity: 1;
+}
+
+/* Активное состояние */
+.button:active {
+  transform: translateY(1px);
+  box-shadow: 0 1px 4px -1px rgba(0,0,0,0.1);
+}
+
+/* Фокус-состояние */
+.button:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.3);
+}
+
+.section-title {
+  font-size: 2.1rem;
+  font-weight: 600;
+  color: #1e293b;
+  margin: 0 auto 2.5rem;
+  max-width: 90%;
+  line-height: 1.4;
+  text-align: center;
+}
+
+.grid {
+  display: grid;
+  gap: 2rem;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  margin-bottom: 3rem;
+  grid-auto-rows: minmax(200px, auto);
+}
+
+.card {
+  background: white;
+  border-radius: 16px;
+  padding: 2rem;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+  border: 1px solid #f1f5f9;
+  display: flex;
+  flex-direction: column;
+  min-height: 300px; /* Фиксированная высота для карточек */
+}
+
+.card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 25px rgba(0,0,0,0.12);
+}
+
+.card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 4px;
+  background: linear-gradient(90deg, #6366f1 0%, #10b981 100%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.card:hover::before {
+  opacity: 1;
+}
+
+.card-title {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 1rem;
+  line-height: 1.4;
+  text-align: center;
+}
+
+
+
+.card-description {
+  color: #64748b;
+  line-height: 1.6;
+  margin: 1rem 0;
+  font-size: 0.95rem;
+  flex-grow: 1; /* Занимает доступное пространство */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  -webkit-line-clamp: 6; /* Максимум 6 строк */
+  max-height: 9em; /* Резервное значение */
+}
+
+.card-link {
+  color: #6366f1;
+  text-decoration: none;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.8rem;
+  padding: 0.8rem 1.5rem;
+  border-radius: 8px;
+  background: rgba(99, 102, 241, 0.1);
+  transition: all 0.2s ease;
+  margin-top: auto; /* Прижимаем кнопку к низу */
+  width: max-content;
+  align-self: center; /* Центрирование */
+}
+
+.card-link::after {
+  content: '→';
+  font-weight: 700;
+  opacity: 0;
+  transform: translateX(-5px);
+  transition: all 0.2s ease;
+}
+
+.card-link:hover {
+  background: rgba(99, 102, 241, 0.15);
+  padding-right: 2rem;
+}
+
+.card-link:hover::after {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+@media (max-width: 768px) {
+  .container {
+    padding: 1.5rem 1rem;
+  }
+
+  .header {
+    font-size: 2.2rem;
+    max-width: 100%;
+  }
+
+  .section-title {
+    font-size: 1.8rem;
+  }
+
+  .grid {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+
+    .card {
+    padding: 1.5rem;
+    min-height: 250px;
+  }
+
+  .card-title {
+    font-size: 1.2rem;
+  }
+
+  .card-link {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .card-description {
+    -webkit-line-clamp: 4;
+    max-height: 6em;
+  }
+
+  .button {
+    padding: 0.9rem 1.5rem;
+    font-size: 1rem;
+    width: 100%;
+    justify-content: center;
+  }
+
+  .button:hover {
+    transform: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .header {
+    font-size: 1.8rem;
+    line-height: 1.2;
+  }
+
+  .card-title {
+    font-size: 1.3rem;
+    -webkit-line-clamp: 3;
+  }
+
+  .card-description {
+    -webkit-line-clamp: 5;
+  }
+}
+
+.load-more {
+  text-align: center;
+  margin-top: 2rem;
+}

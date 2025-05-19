@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block title %}Настройки индекса{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto mt-10 p-6 bg-white rounded-lg shadow-md">
+    <h1 class="text-2xl font-semibold mb-6">Настройки индекса</h1>
+
+    <form action="/update_index_bot/{{ index.id }}" method="POST" class="space-y-6">
+        <div>
+            <label class="block text-gray-700 font-medium mb-1">Название индекса</label>
+            <p class="p-2 border rounded bg-gray-50">{{ index.name }}</p>
+        </div>
+
+        <div>
+            <label class="block text-gray-700 font-medium mb-1">Описание</label>
+            <p class="p-2 border rounded bg-gray-50">{{ index.description }}</p>
+        </div>
+
+        <div>
+            <label class="block text-gray-700 font-medium mb-1">Milvus Index</label>
+            <p class="p-2 border rounded bg-gray-50">{{ index.milvus_index_name }}</p>
+        </div>
+
+        <div>
+            <label class="block text-gray-700 font-medium mb-1">Приватность</label>
+            <p class="p-2 border rounded bg-gray-50">
+                {% if index.is_private %}
+                    🔒 Приватный
+                {% else %}
+                    🌐 Публичный
+                {% endif %}
+            </p>
+        </div>
+
+        <div>
+            <label for="bot_token" class="block text-gray-700 font-medium mb-1">Telegram Token</label>
+            <input
+                type="text"
+                id="bot_token"
+                name="bot_token"
+                value="{{ telegram_bot.token if telegram_bot else '' }}"
+                class="w-full border rounded p-2"
+                placeholder="Введите токен от BotFather"
+            />
+        </div>
+
+        <div>
+            <label for="bot_url" class="block text-gray-700 font-medium mb-1">Ссылка на бота</label>
+            <input
+                type="text"
+                id="bot_url"
+                name="bot_url"
+                value="{{ telegram_bot.bot_url if telegram_bot else '' }}"
+                class="w-full border rounded p-2"
+                placeholder="Например, https://t.me/your_bot"
+            />
+        </div>
+
+        <div class="text-right">
+            <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-md">
+                💾 Сохранить
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}
