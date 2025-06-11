@@ -14,7 +14,9 @@ async def create_new_index(index_in: IndexCreate):
         name=index_in.name,
         description=index_in.description,
         is_private=index_in.is_private,
-        user_id=index_in.user_id
+        user_id=index_in.user_id,
+        llm_type=index_in.llm_type,
+        token=index_in.token
     )
 
     async with SessionLocal() as session:
@@ -59,4 +61,5 @@ async def get_tg_bot_by_index(index_id: uuid.UUID) -> SearchIndex | None:
     async with SessionLocal() as session:
         async with session.begin():
             result = (await session.execute(select(SearchIndex).filter(SearchIndex.id == index_id).options(joinedload(SearchIndex.telegram_bots)))).first()
+    print(result[0].telegram_bots)
     return result[0].telegram_bots

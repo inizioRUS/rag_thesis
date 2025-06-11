@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import styles from './Home.module.css';
 
 interface Index {
   id: string;
   name: string;
   description: string;
+  rating: number; // ⭐ добавили рейтинг
 }
 
 export default function Home() {
@@ -13,19 +14,21 @@ export default function Home() {
   const [favorites, setFavorites] = useState<Index[]>([]);
   const [showFavorites, setShowFavorites] = useState(false);
   const [page, setPage] = useState(1);
-
-  useEffect(() => {
-    const loadIndices = async () => {
-      try {
-        const response = await fetch(`http://127.0.0.1:8000/api/indices?page=${page}&per_page=12`);
-        const data = await response.json();
-        setIndices(data.indices);
-      } catch (error) {
-        console.error('Error loading indices:', error);
-      }
-    };
-    loadIndices();
-  }, [page]);
+  const navigate = useNavigate();
+useEffect(() => {
+  const loadIndices = async () => {
+    try {
+      const response = await fetch(`http://127.0.0.1:8000/api/indices?page=${page}&per_page=12`);
+      const data = await response.json();
+      if (data.indices.length === 0) return;
+      setIndices(prev => [...prev, ...data.indices]);
+      setPage(page);
+    } catch (error) {
+      console.error('Error loading indices:', error);
+    }
+  };
+  loadIndices();
+}, [page]);  // <- вот здесь один раз закрываем useEffect
 
   const toggleFavorites = () => setShowFavorites(!showFavorites);
 
@@ -34,7 +37,9 @@ export default function Home() {
       setFavorites([...favorites, index]);
     }
   };
-
+    const loadNextPage = () => {
+      setPage(prev => prev + 1);
+    }
   return (
     <div className={styles.container}>
       {/* Боковая панель избранного */}
@@ -46,8 +51,17 @@ export default function Home() {
         <div className={styles.favoritesList}>
           {favorites.map(index => (
             <div key={index.id} className={styles.favoriteItem}>
-              <h4>{index.name}</h4>
-              <p>{index.description}</p>
+            <p className={styles.cardDescription}>{index.description}</p>
+
+                <div className={styles.cardActions}>
+                  <Link to={`/index/${index.id}`} className={`${styles.button} ${styles.chat}`}>
+                    💬 Чат
+                  </Link>
+                  <Link to={`/setting_index/${index.id}`} className={`${styles.button} ${styles.settings}`}>
+                    ⚙️ Настройки
+                  </Link>
+                </div>
+
             </div>
           ))}
         </div>
@@ -57,7 +71,9 @@ export default function Home() {
       <div className={styles.mainContent}>
         {/* Шапка */}
         <div className={styles.header}>
-          <Link to="/" className={styles.homeButton}>🏠</Link>
+        <button onClick={() => navigate(-1)} className={styles.backButton}>
+        ← Назад
+      </button>
           <button onClick={toggleFavorites} className={styles.favoritesButton}>
             ★ Избранное ({favorites.length})
           </button>
@@ -65,7 +81,6 @@ export default function Home() {
 
         {/* Навигация */}
         <nav className={styles.navBar}>
-          <Link to="/main" className={styles.navLink}>Главная</Link>
           <Link to="/make_index" className={`${styles.navLink} ${styles.primary}`}>Создать индекс</Link>
           <Link to="/logout" className={`${styles.navLink} ${styles.danger}`}>Выйти</Link>
         </nav>
@@ -99,11 +114,22 @@ export default function Home() {
                 </div>
               </div>
             ))}
+
           </div>
+
         ) : (
           <p className={styles.emptyState}>У вас пока нет индексов</p>
         )}
+                 <div className="load-more">
+        <button
+          className="button primary"
+          onClick={loadNextPage}
+        >
+          Загрузить больше
+        </button>
       </div>
+      </div>
+
     </div>
   );
 }

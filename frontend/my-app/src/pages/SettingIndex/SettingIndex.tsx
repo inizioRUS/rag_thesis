@@ -17,18 +17,17 @@ interface TelegramBot {
 }
 
 export default function SettingIndex() {
-  const { indexId } = useParams<{ indexId: string }>();
+  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [index, setIndex] = useState<Index | null>(null);
   const [botToken, setBotToken] = useState('');
   const [botUrl, setBotUrl] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
-
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await axios.get(`http://127.0.0.1:8000/setting_index/${indexId}`);
+        const response = await axios.get(`http://127.0.0.1:8000/setting_index/${id}`);
         setIndex(response.data.index);
         setBotToken(response.data.telegram_bot?.token || '');
         setBotUrl(response.data.telegram_bot?.bot_url || '');
@@ -40,16 +39,20 @@ export default function SettingIndex() {
     };
 
     fetchData();
-  }, [indexId]);
+  }, [id]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const formData = new FormData();
+    formData.append('bot_token', botToken);
+    formData.append('bot_url', botUrl);
     try {
-      await axios.post(`http://127.0.0.1:8000/update_index_bot/${indexId}`, {
-        bot_token: botToken,
-        bot_url: botUrl
+      await axios.post(`http://127.0.0.1:8000/update_index_bot/${id}`,formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
       });
-      navigate(`http://127.0.0.1:8000/setting_index/${indexId}`);
+      setError('Изменения успешны');
     } catch (err) {
       setError('Ошибка сохранения настроек');
     }
@@ -60,6 +63,9 @@ export default function SettingIndex() {
 
   return (
     <div className={styles.container}>
+       <button onClick={() => navigate(-1)} className={styles.backButton}>
+        ← Назад
+      </button>
       <h1 className={styles.title}>Настройки индекса</h1>
 
       {error && <div className={styles.errorMessage}>{error}</div>}

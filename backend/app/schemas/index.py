@@ -9,3 +9,5 @@ class IndexCreate(BaseModel):
     milvus_index_name:str
     is_private: bool
     user_id: UUID
+    llm_type: str | None
+    token: str | None

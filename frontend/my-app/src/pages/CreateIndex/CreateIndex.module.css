@@ -120,3 +120,25 @@
   color: #666;
   font-size: 0.9rem;
 }
+.backButton {
+  padding: 1rem 1.5rem;
+  background: #2563eb;
+  color: white;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 1rem;
+  margin-bottom: 1rem;
+}
+
+.backButton:hover {
+  background: #1e40af;
+}
+.select {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background-color: white;
+}

@@ -1,13 +1,15 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import styles from './ChatPage.module.css';
-
+import { useNavigate } from 'react-router-dom';
+import ReactMarkdown from 'react-markdown';
 interface Message {
   id: string;
   content: string;
   sender: 'user' | 'bot';
   timestamp: Date;
   sources?: string[];
+  downloadLink?: string;
 }
 
 interface Chat {
@@ -20,6 +22,8 @@ interface Index {
   id: string;
   name: string;
   description: string;
+  llm_type?: string
+  token?: string
 }
 
 export default function ChatPage() {
@@ -30,8 +34,10 @@ export default function ChatPage() {
   const [chats, setChats] = useState<Chat[]>([]);
   const [selectedChat, setSelectedChat] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [generateDocument, setGenerateDocument] = useState(false);
+  const [documentPrompt, setDocumentPrompt] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
-
+  const navigate = useNavigate();
   // Загрузка данных
   useEffect(() => {
     const fetchData = async () => {
@@ -72,12 +78,16 @@ export default function ChatPage() {
     setIsLoading(true);
 
     try {
-      const response = await fetch('http://127.0.0.1:8000/get_ml_response', {
+      const endpoint = generateDocument ? 'get_ml_document' : 'get_ml_response';
+      const response = await fetch(`http://127.0.0.1:8000/${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: inputMessage,
-          index_id: id
+          document_prompt: generateDocument ? documentPrompt : undefined,
+          index_id: id,
+          llm_type: index?.llm_type || 'local',
+          token: index?.token || ''
         })
       });
 
@@ -87,10 +97,12 @@ export default function ChatPage() {
         content: data.reply,
         sender: 'bot',
         timestamp: new Date(),
-        sources: data.sources
+        sources: data.sources,
+        downloadLink: data.download_link
       };
 
       setMessages(prev => [...prev, botMessage]);
+      setDocumentPrompt(''); // Сбрасываем поле документа после отправки
     } catch (error) {
       console.error('Error:', error);
     } finally {
@@ -137,21 +149,31 @@ export default function ChatPage() {
 
       {/* Основная область */}
       <div className={styles.main}>
-        <header className={styles.header}>
-          <h1>{index.name}</h1>
-          <p>{index.description}</p>
-        </header>
+<header className={styles.header}>
+  <button onClick={() => navigate(-1)} className={styles.backButton}>
+    ← Назад
+  </button>
+  <div className={styles.headerTitle}>
+    <h1>{index.name}</h1>
+  </div>
+</header>
 
         <div className={styles.chatWindow}>
-          {messages.map((message) => (
-            <div
-              key={message.id}
-              className={`${styles.message} ${
-                message.sender === 'user' ? styles.user : styles.bot
-              }`}
-            >
-              <div className={styles.messageContent}>
-                {message.content}
+      {messages.map((message) => (
+        <div key={message.id} className={`${styles.message} ${message.sender === 'user' ? styles.user : styles.bot}`}>
+          <div className={styles.messageContent}>
+            <ReactMarkdown>{message.content}</ReactMarkdown>
+            {message.downloadLink && (
+              <div className={styles.downloadSection}>
+                <a
+                  href={message.downloadLink}
+                  download
+                  className={styles.downloadButton}
+                >
+                  Скачать документ
+                </a>
+              </div>
+            )}
                 {message.sources && (
                   <div className={styles.sources}>
                     <span>Источники:</span>
@@ -175,6 +197,24 @@ export default function ChatPage() {
         </div>
 
         <div className={styles.inputArea}>
+            <div className={styles.documentOptions}>
+            <label className={styles.documentToggle}>
+              <input
+                type="checkbox"
+                checked={generateDocument}
+                onChange={(e) => setGenerateDocument(e.target.checked)}
+              />
+              Генерация документа
+            </label>
+            {generateDocument && (
+              <textarea
+                value={documentPrompt}
+                onChange={(e) => setDocumentPrompt(e.target.value)}
+                placeholder="Введите дополнительные инструкции для документа..."
+                className={styles.documentTextarea}
+              />
+            )}
+          </div>
           <div className={styles.templates}>
             {templates.map((template) => (
               <button

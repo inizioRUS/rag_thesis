@@ -7,16 +7,19 @@ from typing import Dict
 import shutil
 import os
 import threading
-
+import markdown
+import pdfkit
 from llm.llm import LLMAggregate
 from core.db import load
-from services.ml import get_answer
+from llm.llm_api import LLMAAPI
+from services.ml import get_answer, get_answer_doc
 from fastapi.middleware.cors import CORSMiddleware
 
 from services.load_data import load_data, split_texts, vectorize, put_in_milvus
 
 app = FastAPI()
-llm = LLMAggregate(Ollama(model="llama3.1:8b-instruct-q4_0", temperature=0.1, request_timeout=1000, additional_kwargs={"num_predict": 200}))
+llm = LLMAggregate(Ollama(model="llama3.1:8b-instruct-q4_0", temperature=0.1, request_timeout=1000,
+                          additional_kwargs={"num_predict": 200}))
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # или ['http://localhost:3000'] конкретно
@@ -62,16 +65,65 @@ async def check_status(task_id: str):
 class Message(BaseModel):
     message: str
     index_name: str
+    llm_type: str
+    token: str | None
 
 
 @app.post("/get_answer", response_class=JSONResponse)
 async def chat(request: Request, msg: Message):
     message = msg.message
     index_name = msg.index_name
+    llm_type = msg.llm_type
+    token = msg.token
 
-    response = get_answer(index_name, message, llm)
+    if llm_type == "api":
+        llm_api = LLMAAPI(token)
+        response, documents = get_answer(index_name, message, llm_api)
+    else:
+        response, documents = get_answer(index_name, message, llm)
+    return JSONResponse(content={"reply": response, "sources": documents})
 
-    return JSONResponse(content={"reply": response})
+class MessageDoc(BaseModel):
+    message: str
+    index_name: str
+    llm_type: str
+    token: str | None
+    document_prompt:str
+
+@app.post("/get_document", response_class=JSONResponse)
+async def chat(request: Request, msg: MessageDoc):
+    message = msg.message
+    index_name = msg.index_name
+    llm_type = msg.llm_type
+    token = msg.token
+    document_prompt = msg.document_prompt
+    if llm_type == "api":
+        llm_api = LLMAAPI(token)
+        response, documents = get_answer_doc(index_name, message, llm_api, document_prompt)
+    else:
+        response, documents = get_answer_doc(index_name, message, llm, document_prompt)
+    html_text = markdown.markdown(response, extensions=["fenced_code"])
+    task_id = str(uuid4())
+
+    # Оборачивание в HTML-документ
+    html_full = f"""
+    <!DOCTYPE html>
+    <html lang="ru">
+    <head>
+        <meta charset="utf-8">
+        <style>
+            body {{ font-family: sans-serif; line-height: 1.6; padding: 2em; }}
+            h1, h2, h3 {{ color: #333; }}
+            pre, code {{ background: #f4f4f4; padding: 2px 4px; border-radius: 4px; }}
+        </style>
+    </head>
+    <body>
+    {html_text}
+    </body>
+    </html>
+    """
+    pdfkit.from_string(html_full, f"C:/Users/garan/PycharmProjects/diplom/diplom/ml/app/extracted/pdf_output/{task_id}.pdf", configuration=pdfkit.configuration(wkhtmltopdf="C:\Program Files\wkhtmltopdf\\bin\wkhtmltopdf.exe"))
+    return JSONResponse(content={"reply": response, "sources": documents, "download_link":f"static\\pdf_output\\{task_id}.pdf"})
 
 
 # @app.post("/query")

@@ -23,12 +23,11 @@ const handleSubmit = async (e: React.FormEvent) => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password }),
     });
-
-    if (!response.ok) {
       const data = await response.json();
+    if (!response.ok) {
       throw new Error(data.detail || 'Ошибка регистрации');
     }
-
+    localStorage.setItem('token', data.token)
     // В случае успеха
     window.location.href = '/'; // или /main, если надо
 

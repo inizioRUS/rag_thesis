@@ -4,6 +4,8 @@ import yaml
 from models.tg_bot import TelegramBot
 from schemas.tg_bot import TelegramBotCreate
 
+from services.index import get_current_index
+
 # Словарь с запущенными ботами
 running_bots = {}
 from core.db import SessionLocal
@@ -24,11 +26,14 @@ ml_address = config.get("ml", {}).get("address")
 ml_port = config.get("ml", {}).get("port")
 
 
-async def get_ml_response(message: str, index_name: str):
+async def get_ml_response(message: str, index_name: str, llm_type:str, token:str):
     url = f"http://{ml_address}:{ml_port}/get_answer"  # URL вашего ML-сервиса
     data = {
         "message": message,
-        "index_name": index_name
+        "index_name": index_name,
+        "llm_type": llm_type,
+        "token": token
+
     }
 
     # Отправляем запрос к ML-сервису асинхронно
@@ -56,7 +61,8 @@ async def create_new_tg_bot(bot_in: TelegramBotCreate):
         return db_index
 
 
-async def start_bot(index_id: str, token: str):
+async def start_bot(index_id: str, token: str, llm_type, token_llm):
+    print("Проверка")
     bot = Bot(token=token)
     dp = Dispatcher()
 
@@ -66,7 +72,7 @@ async def start_bot(index_id: str, token: str):
 
     @dp.message()
     async def handle_message(message: Message):
-        ml_response = await get_ml_response(message.text, index_id)
+        ml_response = await get_ml_response(message.text, index_id, llm_type, token_llm)
         await message.answer(f"🔍 Ты сказал: {message.text}\nОтвет от сервиса: {ml_response}")
 
     try:
@@ -77,13 +83,13 @@ async def start_bot(index_id: str, token: str):
         await bot.session.close()
 
 
-async def launch_bot(index_name: str, token: str):
+async def launch_bot(index_name: str, token: str, llm_type:str, token_llm:str):
     if index_name in running_bots:
         print(f"Бот для индекса {index_name} уже запущен.")
         return
 
     # Запускаем бота как фоновую задачу
-    task = asyncio.create_task(start_bot(index_name, token))
+    task = asyncio.create_task(start_bot(index_name, token, llm_type, token_llm))
     running_bots[index_name] = task
     print(f"Бот запущен для индекса {index_name}.")
 

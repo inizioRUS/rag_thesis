@@ -315,3 +315,23 @@
     grid-template-columns: 1fr;
   }
 }
+
+.backButton {
+  padding: 1rem 1.5rem;
+  background: #2563eb;
+  color: white;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 1rem;
+  margin-bottom: 1rem;
+}
+
+.backButton:hover {
+  background: #1e40af;
+}
+.load-more {
+  text-align: center;
+  margin-top: 2rem;
+}

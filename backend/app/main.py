@@ -1,6 +1,7 @@
+import os
 import uuid
 from typing import Optional
-
+from fastapi.staticfiles import StaticFiles
 import yaml
 from fastapi import FastAPI, Request, Form, Query, Cookie, Response
 from fastapi import UploadFile, File, HTTPException
@@ -39,7 +40,6 @@ ml_port = config.get("ml", {}).get("port")
 
 app = FastAPI()
 
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000"],  # URL вашего React-приложения
@@ -47,6 +47,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# Подключаем папку
+app.mount("/static", StaticFiles(directory="C:/Users/garan/PycharmProjects/diplom/diplom/ml/app/extracted"), name="static")
+
 templates = Jinja2Templates(directory="templates")
 
 
@@ -88,6 +93,7 @@ async def user(request: Request):
     print(user)
     return {"username": user.username}
 
+
 # @app.get("/register", response_class=HTMLResponse)
 # async def register_form(request: Request):
 #     return templates.TemplateResponse("register.html", {"request": request})
@@ -97,7 +103,8 @@ class RegisterData(BaseModel):
     username: str
     password: str
 
-@app.post("register")
+
+@app.post("/register")
 async def register(data: RegisterData):
     existing_users = await get_all_users()
     if any(u.username == data.username for u in existing_users):
@@ -107,10 +114,7 @@ async def register(data: RegisterData):
     await create_user(UserCreate(id=user_id, username=data.username, password=data.password))
     token = create_access_token({"sub": str(user_id)})
 
-    response = JSONResponse({"message": "Регистрация успешна"})
-    response.set_cookie("access_token", token, httponly=True,                secure=False,  # Для разработки без HTTPS
-                samesite="lax",)
-    return response
+    return {"message": "Успешный вход", "token": token}  # Возвращаем токен в теле ответа
 
 
 # @app.get("/login", response_class=HTMLResponse)
@@ -120,6 +124,7 @@ async def register(data: RegisterData):
 class LoginData(BaseModel):
     username: str
     password: str
+
 
 @app.post("/login")
 async def login(data: LoginData):
@@ -146,9 +151,9 @@ async def dashboard(request: Request):
 
 @app.get("/logout")
 async def logout():
-    response = JSONResponse({"message": "Выход выполнен"})
-    response.delete_cookie("access_token")
-    return response
+    # Просто возвращаем сообщение, что выход выполнен
+    return JSONResponse({"message": "Выход выполнен"})
+
 
 @app.post("/upload/")
 async def upload_and_forward(file: UploadFile = File(...)):
@@ -182,18 +187,41 @@ async def create_index(
         description: str = Form(...),
         milvus_index_name: str = Form(...),
         is_private: bool = Form(False),
-        file: UploadFile = File(...)
+        file: UploadFile = File(...),
+        type_llm: str | None = Form(...),
+        token_llm: str | None = Form(...),
 ):
-    token = request.cookies.get("access_token")
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Не авторизован")
+
+    token = auth_header.split(" ")[1]
+    print(token)
+    user_id = decode_token(token)
+    print(user_id)
     user_id = uuid.UUID(decode_token(token))
-    data = {
-        "id": uuid4(),
-        "name": name,
-        "description": description,
-        "milvus_index_name": milvus_index_name,
-        "is_private": bool(is_private),
-        "user_id": user_id,
-    }
+    if type_llm == "local":
+        data = {
+            "id": uuid4(),
+            "name": name,
+            "description": description,
+            "milvus_index_name": milvus_index_name,
+            "is_private": bool(is_private),
+            "user_id": user_id,
+            "llm_type": "local",
+            "token": None
+        }
+    else:
+        data = {
+            "id": uuid4(),
+            "name": name,
+            "description": description,
+            "milvus_index_name": milvus_index_name,
+            "is_private": bool(is_private),
+            "user_id": user_id,
+            "llm_type": "api",
+            "token": token_llm
+        }
     files = {'file': (file.filename, await file.read(), file.content_type)}
     response = requests.post(f'http://{ml_address}:{ml_port}/upload', files=files,
                              data={"index_name": milvus_index_name})
@@ -208,6 +236,8 @@ async def get_indices(page: int = Query(1, ge=1), per_page: int = Query(12, ge=1
     return JSONResponse(
         content={"indices": [{"id": str(i.id), "name": i.name, "description": i.description} for i in indices]}
     )
+
+
 # @app.get("/user")
 # async def user(request: Request,):
 #     token = request.cookies.get("access_token")
@@ -244,14 +274,15 @@ async def get_indices(page: int = Query(1, ge=1), per_page: int = Query(12, ge=1
 #     })
 
 
-@app.get("/index/{id}", response_class=HTMLResponse)
+@app.get("/api/index/{id}", response_class=HTMLResponse)
 async def read_index(request: Request, id: str):
     index_id = uuid.UUID(id)
 
     index = await get_current_index(index_id)
-    print(index)
+
     if index is None:
         return HTMLResponse(content="Индекс не найден", status_code=404)
+
     return JSONResponse({"id": str(index.id), "name": index.name, "description": index.description})
 
 
@@ -267,11 +298,36 @@ async def get_response(request: MessageRequest):
     index = await get_current_index(request.index_id)
     # Запрашиваем ответ у ML-сервиса
     response = requests.post(f'http://{ml_address}:{ml_port}/get_answer',
-                             json={'message': message, "index_name": index.milvus_index_name})
+                             json={'message': message, "index_name": index.milvus_index_name, "llm_type": index.llm_type, "token": index.token})
     response_data = response.json()
     reply = response_data.get('reply', "Что-то пошло не так...")
-    return JSONResponse(content={"reply": reply})
+    sources = response_data.get('sources', [])
+    sources = list(map(lambda x: "http://localhost:8000/" + x, sources))
+    print(sources)
+    return JSONResponse(content={"reply": reply, "sources":sources})
 
+
+class MessageRequestDoc(BaseModel):
+    message: str
+    index_id: str
+    document_prompt:str
+
+@app.post("/get_ml_document")
+async def get_response(request: MessageRequestDoc):
+    # Получаем сообщение от клиента
+    message = request.message
+    index = await get_current_index(request.index_id)
+    # Запрашиваем ответ у ML-сервиса
+    response = requests.post(f'http://{ml_address}:{ml_port}/get_document',
+                             json={'message': message, "index_name": index.milvus_index_name, "llm_type": index.llm_type, "token": index.token, "document_prompt": request.document_prompt})
+    response_data = response.json()
+    reply = response_data.get('reply', "Что-то пошло не так...")
+    sources = response_data.get('sources', [])
+    download_link = response_data.get('download_link', "")
+    download_link = "http://localhost:8000/" + download_link
+    sources = list(map(lambda x: "http://localhost:8000/" + x, sources))
+    print(sources)
+    return JSONResponse(content={"reply": reply, "sources":sources, "download_link": download_link})
 
 class BotConnectRequest(BaseModel):
     index_id: str
@@ -280,15 +336,20 @@ class BotConnectRequest(BaseModel):
 
 @app.get("/setting_index/{index_id}", response_class=HTMLResponse)
 async def setting_index(request: Request, index_id: str):
+    index_id = uuid.UUID(index_id)
     index = await get_current_index(index_id)
-    telegram_bot = (await get_tg_bot_by_index(index_id))
-    if telegram_bot:
+    telegram_bot = await get_tg_bot_by_index(index_id)
+    if len(telegram_bot) != 0:
         telegram_bot = telegram_bot[0]
     if not index:
         return HTMLResponse("Индекс не найден", status_code=404)
-
-    return templates.TemplateResponse("setting_index.html",
-                                      {"request": request, "index": index, "telegram_bot": telegram_bot})
+    print(telegram_bot)
+    return JSONResponse(
+        content={"index": {"id": str(index.id), "name": index.name, "description": index.description,
+                           "milvus_index_name": index.milvus_index_name, "is_private": index.is_private},
+                 "telegram_bot": {"token": telegram_bot.token if telegram_bot else None,
+                                  "bot_url": telegram_bot.bot_url if telegram_bot else None}}
+    )
 
 
 @app.post("/update_index_bot/{index_id}")
@@ -303,5 +364,5 @@ async def update_index_bot(index_id: uuid.UUID, bot_token: str = Form(...), bot_
     await create_new_tg_bot(
         TelegramBotCreate(**data))
     index = await get_current_index(index_id)
-    await launch_bot(index.milvus_index_name, bot_token)
-    return RedirectResponse(url=f"/setting_index/{index_id}", status_code=303)
+    await launch_bot(index.milvus_index_name, bot_token, index.llm_type, index.token)
+    return {"status": "okay"}

@@ -13,6 +13,8 @@ class SearchIndex(Base):
     name = Column(String, nullable=False)
     description = Column(String)
     is_private = Column(Boolean, default=False, nullable=False)
+    llm_type = Column(String, default=None, nullable=True)
+    token = Column(String, default=None, nullable=True)
     user_id = Column(UUID(as_uuid=True), ForeignKey('users.id'))
 
     user = relationship("User", back_populates="search_indexes")

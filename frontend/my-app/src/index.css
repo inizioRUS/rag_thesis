@@ -301,3 +301,60 @@ code {
   text-align: center;
   margin-top: 2rem;
 }
+.rating {
+  margin: 10px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.stars {
+  display: flex;
+  gap: 2px;
+}
+
+.star {
+  cursor: pointer;
+  color: #ccc;
+  font-size: 20px;
+  transition: color 0.2s;
+}
+
+.star.filled {
+  color: #ffd700;
+}
+
+.star:hover {
+  color: #ffd700;
+}
+
+.rating-text {
+  font-size: 14px;
+  color: #666;
+}
+
+/* Стили для общего (неинтерактивного) рейтинга */
+.average-rating {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.static-stars {
+  pointer-events: none; /* чтобы нельзя было кликать */
+  opacity: 0.6;          /* чуть более тусклые */
+}
+
+.static-stars .star {
+  cursor: default;
+  color: #ccc;
+}
+
+.static-stars .star.filled {
+  color: #ffd700;
+}
+.rating-text small {
+  font-size: 12px;
+  color: #999;
+}
