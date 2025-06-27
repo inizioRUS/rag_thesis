@@ -1,6 +1,7 @@
 import uuid
 
 from models.index import SearchIndex
+from models.chat import Chat
 from schemas.index import IndexCreate
 from core.db import SessionLocal
 from sqlalchemy import select
@@ -63,3 +64,10 @@ async def get_tg_bot_by_index(index_id: uuid.UUID) -> SearchIndex | None:
             result = (await session.execute(select(SearchIndex).filter(SearchIndex.id == index_id).options(joinedload(SearchIndex.telegram_bots)))).first()
     print(result[0].telegram_bots)
     return result[0].telegram_bots
+
+
+async def get_chat_by_index(index_id: uuid.UUID) -> SearchIndex | None:
+    async with SessionLocal() as session:
+        async with session.begin():
+            result = (await session.execute(select(Chat).filter(Chat.index_id == index_id)))
+    return result.scalars().all()

@@ -47,3 +47,5 @@ class LLMAggregate:
         if split_position >= 0:
             answer = answer[split_position + len(ASSISTANT_PROMPT_TEMPLATE_END):]
         return answer
+    def invoke_update_working_context(self, text: str, context: str):
+        pass

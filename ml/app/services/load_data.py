@@ -1,14 +1,20 @@
 import os
 import zipfile
+
+import requests
 from llama_index.core.node_parser import SentenceSplitter
 from pymilvus import connections, FieldSchema, CollectionSchema, DataType, Collection, utility
-from llama_index.core.schema import Document, TextNode, Node
+from llama_index.core.schema import Document, TextNode, Node, MetadataMode
 from core.db import load, insert
 from services.make_embedding import model
 from tqdm import tqdm
 from bs4 import BeautifulSoup
 from docx import Document as docxDoc
 import fitz  # PyMuPDF
+from urllib.parse import urljoin, urlparse
+from playwright.sync_api import sync_playwright, Playwright
+
+
 def load_data(file_path: str, task_id: str) -> list:
     extract_path = os.path.join("extracted", task_id)
     os.makedirs(extract_path, exist_ok=True)
@@ -52,8 +58,60 @@ def load_data(file_path: str, task_id: str) -> list:
     return texts
 
 
-def split_texts(texts_list: list) -> list:
-    splitter = SentenceSplitter(chunk_size=512, chunk_overlap=32)
+def is_valid_url(url, base_domain):
+    parsed = urlparse(url)
+    return parsed.scheme.startswith("https") and base_domain in url
+
+
+def extract_text(html):
+    soup = BeautifulSoup(html, "html.parser")
+    print(soup)
+    for tag in soup(["script", "style", "nav", "footer", "header"]):
+        tag.decompose()
+    return soup.get_text(separator=" ", strip=True)
+
+
+def parsing_web(link: str, task_id: str):
+    visited_urls = set()
+    return _parsing_web(link, task_id, visited_urls, base_domain=link)
+
+
+def _parsing_web(link: str, task_id: str, visited_urls, depth=1, max_depth=40, base_domain=None):
+    if depth > max_depth or link in visited_urls:
+        return []
+    visited_urls.add(link)
+    parsed_url = urlparse(link)
+    if base_domain is None:
+        base_domain = parsed_url.netloc
+    if not is_valid_url(link, base_domain):
+        return []
+
+    try:
+        with sync_playwright() as playwright:
+            browser = playwright.chromium.launch()
+            page = browser.new_page()
+            page.goto(link)
+            browser.close()
+    except Exception as e:
+        print(f"Error fetching {link}: {e}")
+        return []
+
+    html = page.content()
+    text = extract_text(html)
+    # Результат: пара (текст, источник)
+    results = [(text, link)]
+
+    soup = BeautifulSoup(html, "html.parser")
+    for link_tag in soup.find_all("a", href=True):
+        next_url = urljoin(link, link_tag['href'])
+        results.extend(_parsing_web(next_url, task_id, visited_urls, depth + 1, max_depth, base_domain))
+        print(next_url)
+
+    return results
+
+
+def split_texts(texts_list: list, chunk_size, overlap) -> list:
+    splitter = SentenceSplitter(chunk_size=chunk_size, chunk_overlap=overlap)
     chunks = []
     nodes = []
     index = 0
@@ -78,7 +136,9 @@ def vectorize(chunks: list) -> list:
     embeddings = embeddings.tolist()
     chunks_out = []
     for index in tqdm(range(len(chunks))):
-        chunks_out.append({"embedding": embeddings[index], "text": chunks[index].text, "link": chunks[index].metadata["link"], "all_text": chunks[index].metadata["window"]})
+        chunks_out.append(
+            {"embedding": embeddings[index], "text": chunks[index].text, "link": chunks[index].metadata["link"],
+             "all_text": chunks[index].metadata["window"]})
     return chunks_out
 
 
@@ -95,6 +155,27 @@ def put_in_milvus(chunks: list, collection_name: str):
 
     # Вставка данных
     insert(chunks, collection_name)
+
+    # Создание индекса
+    collection.create_index(field_name="embedding", index_params={
+        "metric_type": "COSINE",
+        "index_type": "IVF_FLAT",
+        "params": {"nlist": 1024}
+    })
+
+    load(collection_name)
+
+
+def make_index_chat(collection_name: str):
+    fields = [
+        FieldSchema(name="id", dtype=DataType.INT64, is_primary=True, auto_id=True),
+        FieldSchema(name="embedding", dtype=DataType.FLOAT_VECTOR, dim=1024),
+        FieldSchema(name="text", dtype=DataType.VARCHAR, max_length=65535),
+    ]
+    schema = CollectionSchema(fields, description="Text search index")
+    collection = Collection(name=collection_name, schema=schema)
+
+    insert([], collection_name)
 
     # Создание индекса
     collection.create_index(field_name="embedding", index_params={

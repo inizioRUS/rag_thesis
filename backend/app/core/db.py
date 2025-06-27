@@ -2,8 +2,12 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sess
 from models.all import Base
 from models.user import User
 from models.index import SearchIndex
-from models.chat import ChatMessage
-from models.tg_bot import TelegramBot
+from models.access import Access
+from models.chat import Chat
+from models.favorite import Favorite
+from models.msg import ChatMessage
+from models.ratings import Ratings
+from models.role import Role
 SQLALCHEMY_DATABASE_URL = "postgresql+asyncpg://myuser:mypassword@localhost:5432/mydatabase"
 
 engine = create_async_engine(SQLALCHEMY_DATABASE_URL, echo=True)

@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import styles from './ChatPage.module.css';
 import { useNavigate } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
+
 interface Message {
   id: string;
   content: string;
@@ -22,72 +23,136 @@ interface Index {
   id: string;
   name: string;
   description: string;
-  llm_type?: string
-  token?: string
+  llm_type?: string;
+  token?: string;
 }
 
+const API_BASE_URL = 'http://127.0.0.1:8000';
+
 export default function ChatPage() {
-  const { id } = useParams<{ id: string }>();
+  const { id: indexId } = useParams<{ id: string }>();
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState('');
   const [index, setIndex] = useState<Index | null>(null);
   const [chats, setChats] = useState<Chat[]>([]);
-  const [selectedChat, setSelectedChat] = useState<string | null>(null);
+  const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [generateDocument, setGenerateDocument] = useState(false);
   const [documentPrompt, setDocumentPrompt] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
-  // Загрузка данных
+
+  // Загрузка индекса и списка чатов
   useEffect(() => {
     const fetchData = async () => {
       try {
         const [indexRes, chatsRes] = await Promise.all([
-          fetch(`http://127.0.0.1:8000/api/index/${id}`),
-          fetch(`/api/chats?index_id=${id}`)
+          fetch(`${API_BASE_URL}/api/index/${indexId}`),
+          fetch(`${API_BASE_URL}/api/chats?index_id=${indexId}`)
         ]);
 
-        setIndex(await indexRes.json());
-        setChats(await chatsRes.json());
+        const indexData = await indexRes.json();
+        const chatsData = await chatsRes.json();
+
+        setIndex(indexData);
+        setChats(chatsData.chats);
+        // Автовыбор последнего чата
+        if (chatsData.length > 0) {
+          setSelectedChatId(chatsData[chatsData.length - 1].id);
+        }
       } catch (error) {
         console.error('Error fetching data:', error);
       }
     };
 
     fetchData();
-  }, [id]);
+  }, [indexId]);
+
+  // Загрузка сообщений выбранного чата
+  useEffect(() => {
+    const loadChatMessages = async () => {
+      if (!selectedChatId) {
+        setMessages([]);
+        return;
+      }
+
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/chats/${selectedChatId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+        const chat: Chat = await response.json();
+        setMessages(chat.messages);
+      } catch (error) {
+        console.error('Error loading chat:', error);
+      }
+    };
+
+    loadChatMessages();
+  }, [selectedChatId]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
   useEffect(() => scrollToBottom(), [messages]);
+  const token = localStorage.getItem('token');
+  // Создание нового чата
+  const handleCreateNewChat = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/chats`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({
+          index_id: indexId,
+          title: `Новый чат ${new Date().toLocaleTimeString()}`,
+        })
+      });
 
+      const newChat: Chat = await response.json();
+      setChats(prev => [...prev, newChat]);
+      setSelectedChatId(newChat.id);
+      setMessages([]);
+      setInputMessage('');
+      setDocumentPrompt('');
+    } catch (error) {
+      console.error('Error creating chat:', error);
+    }
+  };
+
+  // Отправка сообщения
   const handleSendMessage = async () => {
-    if (!inputMessage.trim()) return;
+    if (!inputMessage.trim() || !selectedChatId) return;
 
-    const newMessage: Message = {
+    const userMessage: Message = {
       id: Date.now().toString(),
       content: inputMessage,
       sender: 'user',
       timestamp: new Date()
     };
 
-    setMessages(prev => [...prev, newMessage]);
+    // Обновляем локальное состояние и сервер
+    const newMessages = [...messages, userMessage];
+    setMessages(newMessages);
+    await saveChatMessages(selectedChatId, newMessages);
+
     setInputMessage('');
     setIsLoading(true);
 
     try {
+      const token = localStorage.getItem('token');
       const endpoint = generateDocument ? 'get_ml_document' : 'get_ml_response';
-      const response = await fetch(`http://127.0.0.1:8000/${endpoint}`, {
+      const response = await fetch(`${API_BASE_URL}/${endpoint}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json',
+         'Authorization': `Bearer ${token}` },
         body: JSON.stringify({
           message: inputMessage,
           document_prompt: generateDocument ? documentPrompt : undefined,
-          index_id: id,
-          llm_type: index?.llm_type || 'local',
-          token: index?.token || ''
+          index_id: indexId,
+          chat_id: selectedChatId
         })
       });
 
@@ -101,12 +166,31 @@ export default function ChatPage() {
         downloadLink: data.download_link
       };
 
-      setMessages(prev => [...prev, botMessage]);
-      setDocumentPrompt(''); // Сбрасываем поле документа после отправки
+      // Обновляем сервер с новым сообщением бота
+      const updatedMessages = [...newMessages, botMessage];
+      setMessages(updatedMessages);
+      await saveChatMessages(selectedChatId, updatedMessages);
+
+      setDocumentPrompt('');
     } catch (error) {
       console.error('Error:', error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // Сохранение сообщений чата на сервере
+  const saveChatMessages = async (chatId: string, messages: Message[]) => {
+    try {
+      await fetch(`${API_BASE_URL}/api/chats/${chatId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+          },
+        body: JSON.stringify({ messages })
+      });
+    } catch (error) {
+      console.error('Error saving chat:', error);
     }
   };
 
@@ -126,20 +210,20 @@ export default function ChatPage() {
         <div className={styles.newChat}>
           <button
             className={styles.newChatButton}
-            onClick={() => setSelectedChat(null)}
+            onClick={handleCreateNewChat}
           >
             + Новый чат
           </button>
         </div>
 
         <div className={styles.chatList}>
-          {chats.map(chat => (
+          {Array.isArray(chats) && chats.map(chat => (
             <div
               key={chat.id}
               className={`${styles.chatItem} ${
-                selectedChat === chat.id ? styles.active : ''
+                selectedChatId === chat.id ? styles.active : ''
               }`}
-              onClick={() => setSelectedChat(chat.id)}
+              onClick={() => setSelectedChatId(chat.id)}
             >
               {chat.title}
             </div>
@@ -149,31 +233,31 @@ export default function ChatPage() {
 
       {/* Основная область */}
       <div className={styles.main}>
-<header className={styles.header}>
-  <button onClick={() => navigate(-1)} className={styles.backButton}>
-    ← Назад
-  </button>
-  <div className={styles.headerTitle}>
-    <h1>{index.name}</h1>
-  </div>
-</header>
+        <header className={styles.header}>
+          <button onClick={() => navigate(-1)} className={styles.backButton}>
+            ← Назад
+          </button>
+          <div className={styles.headerTitle}>
+            <h1>{index.name}</h1>
+          </div>
+        </header>
 
         <div className={styles.chatWindow}>
-      {messages.map((message) => (
-        <div key={message.id} className={`${styles.message} ${message.sender === 'user' ? styles.user : styles.bot}`}>
-          <div className={styles.messageContent}>
-            <ReactMarkdown>{message.content}</ReactMarkdown>
-            {message.downloadLink && (
-              <div className={styles.downloadSection}>
-                <a
-                  href={message.downloadLink}
-                  download
-                  className={styles.downloadButton}
-                >
-                  Скачать документ
-                </a>
-              </div>
-            )}
+          {messages.map((message) => (
+            <div key={message.id} className={`${styles.message} ${message.sender === 'user' ? styles.user : styles.bot}`}>
+              <div className={styles.messageContent}>
+                <ReactMarkdown>{message.content}</ReactMarkdown>
+                {message.downloadLink && (
+                  <div className={styles.downloadSection}>
+                    <a
+                      href={message.downloadLink}
+                      download
+                      className={styles.downloadButton}
+                    >
+                      Скачать документ
+                    </a>
+                  </div>
+                )}
                 {message.sources && (
                   <div className={styles.sources}>
                     <span>Источники:</span>
@@ -197,7 +281,7 @@ export default function ChatPage() {
         </div>
 
         <div className={styles.inputArea}>
-            <div className={styles.documentOptions}>
+          <div className={styles.documentOptions}>
             <label className={styles.documentToggle}>
               <input
                 type="checkbox"
@@ -215,6 +299,7 @@ export default function ChatPage() {
               />
             )}
           </div>
+
           <div className={styles.templates}>
             {templates.map((template) => (
               <button
@@ -240,7 +325,7 @@ export default function ChatPage() {
             <button
               className={styles.sendButton}
               onClick={handleSendMessage}
-              disabled={isLoading}
+              disabled={isLoading || !selectedChatId}
             >
               {isLoading ? '✧' : '➤'}
             </button>

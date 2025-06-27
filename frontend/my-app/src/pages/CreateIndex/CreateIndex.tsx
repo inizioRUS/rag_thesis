@@ -14,6 +14,10 @@ export default function CreateIndex() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [llmType, setLlmType] = useState<'local' | 'api'>('local');
   const [apiToken, setApiToken] = useState('');
+  const [uploadType, setUploadType] = useState<'file' | 'url'>('file'); // 👈 Новое состояние
+  const [url, setUrl] = useState(''); // 👈 Новое состояние для URL
+  const [chunkSize, setChunkSize] = useState<number>(512); // 👈 Добавлено
+  const [overlap, setOverlap] = useState<number>(64);        // 👈 Добавлено
 
   const navigate = useNavigate(); // 👈 добавить
 
@@ -45,7 +49,23 @@ export default function CreateIndex() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedFile) return;
+    if (isNaN(chunkSize) || chunkSize <= 256 ) {
+      setUploadStatus('Размер чанка должен быть положительным числом');
+      return;
+    }
+    if (isNaN(overlap) || overlap < 10) {
+      setUploadStatus('Перекрытие не может быть отрицательным');
+      return;
+    }
+    if (uploadType === 'file' && !selectedFile) {
+      setUploadStatus('Пожалуйста, выберите файл');
+      return;
+    }
+
+    if (uploadType === 'url' && !url) {
+      setUploadStatus('Пожалуйста, введите ссылку');
+      return;
+    }
 
     if (llmType === 'api' && !apiToken) {
       setUploadStatus('Токен обязателен для внешнего API');
@@ -57,9 +77,15 @@ export default function CreateIndex() {
     formData.append('description', description);
     formData.append('milvus_index_name', milvusIndexName);
     formData.append('is_private', String(isPrivate));
-    formData.append('file', selectedFile);
     formData.append('type_llm', llmType);
     formData.append('token_llm', apiToken);
+     formData.append('chunk_size', String(chunkSize)); // 👈 Добавлено
+    formData.append('overlap', String(overlap));     // 👈 Добавлено
+    if (uploadType === 'file' && selectedFile) {
+      formData.append('file', selectedFile);
+    } else if (uploadType === 'url' && url) {
+      formData.append('url', url);
+    }
     const token = localStorage.getItem('token');
     try {
       setUploadStatus('Отправка архива...');
@@ -128,57 +154,81 @@ export default function CreateIndex() {
           />
         </div>
 
-<div className={styles.formGroup}>
-  <label htmlFor="file-upload" className={styles.label}>
-    Загрузите архив с текстом (zip)
-  </label>
+         <div className={styles.formGroup}>
+          <label className={styles.label}>Тип загрузки</label>
+          <div className={styles.radioGroup}>
+            <label className={styles.radioLabel}>
+              <input
+                type="radio"
+                value="file"
+                checked={uploadType === 'file'}
+                onChange={() => setUploadType('file')}
+              />
+              Файл
+            </label>
+            <label className={styles.radioLabel}>
+              <input
+                type="radio"
+                value="url"
+                checked={uploadType === 'url'}
+                onChange={() => setUploadType('url')}
+              />
+              Ссылка
+            </label>
+          </div>
+        </div>
 
-  <div
-    className={`${styles.dropzone} ${isDragging ? styles.dragging : ''}`}
-    onDragOver={(e) => {
-      e.preventDefault();
-      setIsDragging(true);
-    }}
-    onDragLeave={() => setIsDragging(false)}
-    onDrop={(e) => {
-      e.preventDefault();
-      setIsDragging(false);
-      const file = e.dataTransfer.files?.[0];
-      if (file) {
-        handleFile(file);
-      }
-    }}
-    onClick={() => fileInputRef.current?.click()}
-    role="button"
-    tabIndex={0}
-    onKeyDown={(e) => {
-      if (e.key === 'Enter' || e.key === ' ') {
-        fileInputRef.current?.click();
-      }
-    }}
-    aria-label="Зона загрузки файла"
-  >
-    <p className={styles.dropzoneText}>
-      {selectedFile
-        ? `Выбран файл: ${selectedFile.name}`
-        : 'Перетащите .zip файл сюда или нажмите для выбора'}
-    </p>
-    <input
-      id="file-upload"
-      type="file"
-      ref={fileInputRef}
-      onChange={(e) => {
-        const file = e.target.files?.[0];
-        if (file) {
-          handleFile(file);
-        }
-      }}
-      accept=".zip"
-      className={styles.fileInput}
-      style={{ display: 'none' }}
-    />
-  </div>
-</div>
+        {uploadType === 'file' && (
+          <div className={styles.formGroup}>
+            <label htmlFor="file-upload" className={styles.label}>
+              Загрузите архив с текстом (zip)
+            </label>
+            <div
+              className={`${styles.dropzone} ${isDragging ? styles.dragging : ''}`}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              onClick={() => fileInputRef.current?.click()}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  fileInputRef.current?.click();
+                }
+              }}
+              aria-label="Зона загрузки файла"
+            >
+              <p className={styles.dropzoneText}>
+                {selectedFile
+                  ? `Выбран файл: ${selectedFile.name}`
+                  : 'Перетащите .zip файл сюда или нажмите для выбора'}
+              </p>
+              <input
+                id="file-upload"
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileInput}
+                accept=".zip"
+                className={styles.fileInput}
+                style={{ display: 'none' }}
+              />
+            </div>
+          </div>
+        )}
+
+        {uploadType === 'url' && (
+          <div className={styles.formGroup}>
+            <label className={styles.label}>Ссылка на сайт</label>
+            <input
+              type="url"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              className={styles.input}
+              placeholder="https://example.com/archive"
+              required
+            />
+          </div>
+        )}
 
         <div className={styles.formGroup}>
           <label className={styles.label}>Название индекса в Milvus</label>
@@ -190,7 +240,31 @@ export default function CreateIndex() {
             required
           />
         </div>
+        <div className={styles.formGroup}>
+          <label className={styles.label}>Размер чанка (chunk size)</label>
+          <input
+            type="number"
+            value={chunkSize}
+            onChange={(e) => setChunkSize(Number(e.target.value))}
+            className={styles.input}
+            min="1"
+            required
+          />
+          <p className={styles.hint}>Рекомендуемое значение: 256-512 символов</p>
+        </div>
 
+        <div className={styles.formGroup}>
+          <label className={styles.label}>Перекрытие (overlap)</label>
+          <input
+            type="number"
+            value={overlap}
+            onChange={(e) => setOverlap(Number(e.target.value))}
+            className={styles.input}
+            min="0"
+            required
+          />
+          <p className={styles.hint}>Рекомендуется 10-20% от размера чанка</p>
+        </div>
         <div className={styles.checkboxGroup}>
           <input
             type="checkbox"

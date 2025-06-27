@@ -18,5 +18,8 @@ class SearchIndex(Base):
     user_id = Column(UUID(as_uuid=True), ForeignKey('users.id'))
 
     user = relationship("User", back_populates="search_indexes")
-    chat_messages = relationship("ChatMessage", back_populates="search_index")
+    chat = relationship("Chat", back_populates="search_index")
+    access = relationship("Access", back_populates="search_index")
+    favorite = relationship("Favorite", back_populates="search_index")
+    rating = relationship("Ratings", back_populates="search_index")
     telegram_bots = relationship("TelegramBot", back_populates="search_index")
